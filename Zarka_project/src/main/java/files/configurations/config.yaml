@@ -1,0 +1,11 @@
+numNodes: 5
+TCPports:
+  - 1000
+  - 2000
+  - 3000
+  - 4000
+  - 5000
+quroum:
+  read: 3
+  write: 3
+replication: 3

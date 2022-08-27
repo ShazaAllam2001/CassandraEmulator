@@ -1,0 +1,12 @@
+!!helpingTools.yaml.Configuration
+TCPports:
+- 100
+- 200
+- 300
+- 400
+- 500
+numNodes: 5
+quroum:
+  read: 3
+  write: 3
+replication: 3
