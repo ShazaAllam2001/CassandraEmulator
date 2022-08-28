@@ -5,10 +5,9 @@ import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
 
 import java.io.*;
-import java.util.*;
 
 public class YamlTool {
-    private final static String currDir = "C:\\Users\\Blu-Ray\\Documents\\OOP Assignments\\Zarka_project\\src\\main\\java\\files\\configurations\\";
+    private final static String currDir = "C:\\Users\\Blu-Ray\\Documents\\OOP Assignments\\CassandraEmulator\\Zarka_project\\src\\main\\java\\clientServer\\files\\configurations\\";
 
     public static Configuration readYaml(String fileName) throws FileNotFoundException {
         InputStream inputStream = new FileInputStream(currDir + fileName);

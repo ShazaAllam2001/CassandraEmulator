@@ -1,3 +1,5 @@
+package clientServer;
+
 import helpingTools.lsmTree.model.LSMTree;
 import helpingTools.yaml.Configuration;
 
@@ -12,11 +14,11 @@ public class ServerStart {
             LSMTree tree = new LSMTree("server_" + i + "_Tree", 5, 5);
             servers[i] = new Server(config.getTCPports()[i],tree);
             if (i!=0) {
-                //servers[0].connectToServer(servers[i]);
+                servers[0].connectToServer(servers[i]);
+            } else {
                 servers[0].connectToClient();
             }
         }
-        //servers[0].connectToClient();
 
         return servers;
     }

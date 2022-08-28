@@ -5,7 +5,7 @@ TCPports:
   - 3000
   - 4000
   - 5000
-quroum:
+quorum:
   read: 3
   write: 3
 replication: 3

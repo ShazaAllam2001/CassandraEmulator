@@ -15,7 +15,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class LSMTree implements ILSMTree {
-    private final static String dir = "C:\\Users\\Blu-Ray\\Documents\\OOP Assignments\\Zarka_project\\src\\main\\java\\files\\trees\\";
+    private final static String dir = "C:\\Users\\Blu-Ray\\Documents\\OOP Assignments\\CassandraEmulator\\Zarka_project\\src\\main\\java\\clientServer\\files\\trees\\";
 
     public static final String SEGMENT = ".segment";
     public static final String WAL = "wal";

@@ -1,3 +1,5 @@
+package clientServer;
+
 import helpingTools.yaml.Configuration;
 import helpingTools.yaml.YamlTool;
 
@@ -31,22 +33,22 @@ public class Client {
         while(true) {
             sendMessage = keyRead.readLine();  // keyboard reading
             pwrite.println(sendMessage);       // sending to server
-            pwrite.flush();                    // flush the data
+            pwrite.flush();
 
             receiveMessage = receiveRead.readLine(); //receive from server
             if(receiveMessage == "Exit") {
                 //close connection
                 System.out.println("Closing connection");
                 socket.close();
+                keyRead.close();
                 pwrite.close();
                 receiveRead.close();
                 break;
             }
             if(receiveMessage != null) {
-                System.out.println(receiveMessage); // displaying at DOS prompt
+                System.out.println(receiveMessage);
             }
         }
-
     }
 
     public static void main(String[] args) throws Exception {

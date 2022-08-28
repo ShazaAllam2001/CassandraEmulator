@@ -3,7 +3,7 @@ package helpingTools.lsmTree;
 import helpingTools.lsmTree.model.LSMTree;
 
 public class TestTree {
-    private final static String currDir = "C:\\Users\\Blu-Ray\\Documents\\OOP Assignments\\Zarka_project\\src\\main\\java\\files\\trees\\";
+    private final static String currDir = "C:\\Users\\Blu-Ray\\Documents\\OOP Assignments\\Zarka_project\\src\\main\\java\\clientServer.files\\trees\\";
 
     public static void main(String args[]) {
         LSMTree obj = new LSMTree("server_" + 0 + "_Tree", 5, 5);

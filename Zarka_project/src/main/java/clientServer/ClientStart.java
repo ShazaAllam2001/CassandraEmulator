@@ -1,3 +1,5 @@
+package clientServer;
+
 import helpingTools.yaml.Configuration;
 
 import java.io.IOException;

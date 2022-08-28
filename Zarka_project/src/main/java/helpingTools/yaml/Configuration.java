@@ -3,7 +3,7 @@ package helpingTools.yaml;
 public class Configuration {
     private int numNodes;
     private int[] TCPports;
-    private Quroum quroum;
+    private Quorum quorum;
     private int replication;
 
     // getters and setters
@@ -23,12 +23,12 @@ public class Configuration {
         this.TCPports = TCPports;
     }
 
-    public Quroum getQuroum() {
-        return quroum;
+    public Quorum getQuroum() {
+        return quorum;
     }
 
-    public void setQuroum(Quroum quroum) {
-        this.quroum = quroum;
+    public void setQuroum(Quorum quorum) {
+        this.quorum = quorum;
     }
 
     public int getReplication() {

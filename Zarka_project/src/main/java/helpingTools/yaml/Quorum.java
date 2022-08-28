@@ -1,6 +1,6 @@
 package helpingTools.yaml;
 
-public class Quroum {
+public class Quorum {
     private int read;
     private int write;
 

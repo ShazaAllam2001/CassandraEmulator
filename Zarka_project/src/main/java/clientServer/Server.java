@@ -1,3 +1,5 @@
+package clientServer;
+
 import helpingTools.lsmTree.model.LSMTree;
 import helpingTools.yaml.Configuration;
 import helpingTools.yaml.YamlTool;
@@ -11,6 +13,7 @@ public class Server {
     public ServerSocket serverSocket;
     public Socket socket;
     public List<Server> servers;
+    public List<Thread> serversThreads;
     public final int port;
     public PrintWriter pwrite;
     public BufferedReader receiveRead;
@@ -21,6 +24,7 @@ public class Server {
         this.serverSocket = new ServerSocket(port);
         this.serverSocket.setReuseAddress(true); // For being able to use multi-servers
         this.servers = new ArrayList<>();
+        this.serversThreads = new ArrayList<>();
         this.tree = tree;
         System.out.println("Server started");
     }
@@ -60,24 +64,15 @@ public class Server {
     }
 
     public void connectToServer(Server server) throws IOException {
-        // create a new thread object for the server
-        ServerThread serverSock = new ServerThread(server);
-
-        // This thread will handle the server separately
-        Thread serverThread = new Thread(serverSock);
-        serverThread.start();
-
-        // socket object for the client
-        Socket coordinator = new Socket("127.0.0.2", server.port);
+        // We connect with other servers as Clients
+        Socket socket = serverSocket.accept();
         this.servers.add(server);
+        System.out.println("clientServer.Server Connected");
 
-        // sending to client (pwrite object)
-        OutputStream ostream = coordinator.getOutputStream();
-        server.pwrite = new PrintWriter(ostream, true);
-
-        // receiving from server (receiveRead  object)
-        InputStream istream = coordinator.getInputStream();
-        server.receiveRead = new BufferedReader(new InputStreamReader(istream));
+        ThreadHandler serverThread = new ThreadHandler(socket);
+        Thread thread = new Thread(serverThread);
+        this.serversThreads.add(thread);
+        thread.start();
     }
 
     public static void main(String[] args) throws Exception {

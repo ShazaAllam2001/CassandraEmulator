@@ -6,7 +6,7 @@ TCPports:
 - 400
 - 500
 numNodes: 5
-quroum:
+quorum:
   read: 3
   write: 3
 replication: 3
