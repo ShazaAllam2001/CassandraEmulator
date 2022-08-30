@@ -46,6 +46,28 @@ public class ClientThreadHandler implements Runnable {
                 sendMessage = ClientCommand.executeCommand(parsedCommand, server.tree);
                 server.out.println(sendMessage);
                 server.out.flush();
+
+                /*// parse & execute command
+                List<String> parsedCommand = ClientCommand.parseCommand(receiveMessage);
+                // get nums of servers associated with the key
+                if(!parsedCommand.get(0).equals("Invalid Command!")) {
+                    List<Integer> serversNums = server.getHashing().getServers(parsedCommand.get(1));
+                    // if the key exists in the coordinator
+                    if(serversNums.contains(0)) {
+                        sendMessage = ClientCommand.executeCommand(parsedCommand, server.tree);
+                        server.out.println(sendMessage);
+                        server.out.flush();
+                    }
+                    else {
+                        int serverToAsk = serversNums.get(0);
+                        // send request to the first server that has the key
+                        server.servers.get(serverToAsk-1).out.println(receiveMessage);
+                    }
+                } else {
+                    sendMessage = "Invalid Command!";
+                    server.out.println(sendMessage);
+                    server.out.flush();
+                }*/
             }
         }
         catch (IOException e) {

@@ -39,7 +39,7 @@ public class Server {
         Socket socketServer = serverSocket.accept();
         System.out.println("New Server Connected");
 
-        ThreadHandler serverThread = new ThreadHandler(socketServer, server);
+        ServerThreadHandler serverThread = new ServerThreadHandler(socketServer, server, this);
         Thread thread = new Thread(serverThread);
         thread.start();
     }
