@@ -28,10 +28,4 @@ public class YamlTool {
         yaml.dump(obj, writer);
     }
 
-    public static void main(String args[]) throws FileNotFoundException {
-        Configuration data = YamlTool.readYaml("config.yaml");
-        System.out.println(data.getQuroum().getRead());
-
-        YamlTool.writeYaml("config3.yaml", data);
-    }
 }

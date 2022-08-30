@@ -7,29 +7,28 @@ import java.io.PrintWriter;
 import java.net.Socket;
 
 public class ThreadHandler implements Runnable {
-    private final Socket clientSocket;
+    private final Socket socket;
+    private final Server server;
 
-    public ThreadHandler(Socket socket) {
-        this.clientSocket = socket;
+    public ThreadHandler(Socket socket, Server server) {
+        this.socket = socket;
+        this.server = server;
     }
 
     @Override
     public void run() {
-        PrintWriter out = null;
-        BufferedReader in = null;
         try {
-            Socket socket = new Socket("127.0.0.1",2000);
-            // get the outputstream of client
-            out = new PrintWriter(clientSocket.getOutputStream(), true);
+            // get the outputstream of other server (client)
+            server.out = new PrintWriter(socket.getOutputStream(), true);
 
-            // get the inputstream of client
-            in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+            // get the inputstream of the client
+            server.in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
             String line;
-            while ((line = in.readLine()) != null) {
-                // writing the received message from client
-                System.out.printf(" Sent from the client: %s\n", line);
-                out.println(line);
+            while ((line = server.in.readLine()) != null) {
+                // output the received message from client
+                System.out.printf("Sent from the coordinator: %s\n", line);
+                server.out.println(line);
             }
         }
         catch (IOException e) {
@@ -37,12 +36,12 @@ public class ThreadHandler implements Runnable {
         }
         finally {
             try {
-                if (out != null) {
-                    out.close();
+                if (server.out != null) {
+                    server.out.close();
                 }
-                if (in != null) {
-                    in.close();
-                    clientSocket.close();
+                if (server.in != null) {
+                    server.in.close();
+                    //clientSocket.close();
                 }
             }
             catch (IOException e) {

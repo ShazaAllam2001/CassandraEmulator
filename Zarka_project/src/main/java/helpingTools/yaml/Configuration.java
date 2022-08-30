@@ -2,9 +2,11 @@ package helpingTools.yaml;
 
 public class Configuration {
     private int numNodes;
+    private int vNodes;
     private int[] TCPports;
     private Quorum quorum;
     private int replication;
+    private int storeThreshold;
 
     // getters and setters
     public int getNumNodes() {
@@ -15,6 +17,10 @@ public class Configuration {
         this.numNodes = numNodes;
     }
 
+    public int getvNodes() { return vNodes; }
+
+    public void setvNodes(int vNodes) { this.vNodes = vNodes; }
+
     public int[] getTCPports() {
         return TCPports;
     }
@@ -23,11 +29,11 @@ public class Configuration {
         this.TCPports = TCPports;
     }
 
-    public Quorum getQuroum() {
+    public Quorum getQuorum() {
         return quorum;
     }
 
-    public void setQuroum(Quorum quorum) {
+    public void setQuorum(Quorum quorum) {
         this.quorum = quorum;
     }
 
@@ -38,6 +44,10 @@ public class Configuration {
     public void setReplication(int replication) {
         this.replication = replication;
     }
+
+    public int getStoreThreshold() { return storeThreshold; }
+
+    public void setStoreThreshold(int storeThreshold) { this.storeThreshold = storeThreshold; }
 }
 
 

@@ -19,7 +19,7 @@ public class QuorumTool {
         // wait for acknowledge (event listener)
         // then increment Acknowledged counter
         // if counter reaches Quroum, return
-        if(Acknowledged == config.getQuroum().getWrite()) {
+        if(Acknowledged == config.getQuorum().getWrite()) {
             return true;
         }
         return false;
@@ -29,7 +29,7 @@ public class QuorumTool {
         for(int i=0; i<servers.length; i++) {
             // read data from all replication nodes
 
-            for(int j=0; j<config.getQuroum().getRead(); j++) {
+            for(int j=0; j<config.getQuorum().getRead(); j++) {
 
             }
         }
