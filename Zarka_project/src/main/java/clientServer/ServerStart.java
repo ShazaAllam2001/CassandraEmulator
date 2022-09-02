@@ -15,14 +15,23 @@ public class ServerStart {
         Server[] servers = new Server[config.getNumNodes()];
         // create servers & connect server[0] (coordinator) to other servers
         for (int i=0; i<config.getNumNodes(); i++) {
-            LSMTree tree = new LSMTree("server_" + i + "_Tree", 5, 5);
-            servers[i] = new Server(config.getTCPports()[i],tree);
+            LSMTree tree = new LSMTree("server_" + i + "_Tree", config.getStoreThreshold(), 5);
+            servers[i] = new Server(config.getTCPports()[i],tree,config);
             if (i!=0) {
                 servers[0].connectToServer(servers[i]);
-            } else {
+            }else {
                 servers[0].connectToClient();
             }
         }
+        /*for(int i=0; i<config.getNumNodes(); i++) {
+            for(int j=i+1; j<config.getNumNodes(); j++) {
+                if(i!=j) {
+                    servers[i].connectToServer(servers[j]);
+                    servers[j].connectToServer(servers[i]);
+                }
+            }
+            servers[i].connectToClient();
+        }*/
 
         return servers;
     }

@@ -28,9 +28,9 @@ public class ServerThreadHandler implements Runnable {
 
             String line;
             while ((line = server.in.readLine()) != null) {
-                // output the received message from client
+                // output the received message from other server (client) to the client
                 System.out.printf("Sent from the server: %s\n", line);
-                coordinator.out.println(line);
+                coordinator.out.println(line+"test");
             }
         }
         catch (IOException e) {

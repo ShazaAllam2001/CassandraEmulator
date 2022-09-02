@@ -1,4 +1,4 @@
-package helpingTools.Quroum;
+package helpingTools.Quorum;
 
 import clientServer.Server;
 import helpingTools.yaml.Configuration;
@@ -18,14 +18,14 @@ public class QuorumTool {
         }
         // wait for acknowledge (event listener)
         // then increment Acknowledged counter
-        // if counter reaches Quroum, return
+        // if counter reaches Quorum, return
         if(Acknowledged == config.getQuorum().getWrite()) {
             return true;
         }
         return false;
     }
 
-    public boolean readQuorum(Server[] servers) {
+    public String readQuorum(Server[] servers) {
         for(int i=0; i<servers.length; i++) {
             // read data from all replication nodes
 
@@ -33,8 +33,9 @@ public class QuorumTool {
 
             }
         }
-        // check that all that the number of nodes with the latest version is equal to the read Quorum
-        // if true then return
-        return false;
+        // return the latest version of data
+        String data = "";
+
+        return data;
     }
 }

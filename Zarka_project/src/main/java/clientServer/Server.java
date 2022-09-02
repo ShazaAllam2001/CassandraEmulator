@@ -1,6 +1,8 @@
 package clientServer;
 
+import helpingTools.ConsistentHashing.ConsistentHashing;
 import helpingTools.lsmTree.model.LSMTree;
+import helpingTools.yaml.Configuration;
 
 import java.io.*;
 import java.net.*;
@@ -15,20 +17,19 @@ public class Server {
     public PrintWriter out;
     public BufferedReader in;
     public final LSMTree tree;
+    public final ConsistentHashing consistentHashing;
 
-    public Server(int port, LSMTree tree) throws IOException {
+    public Server(int port, LSMTree tree, Configuration config) throws IOException {
         this.port = port;
         this.serverSocket = new ServerSocket(port);
         this.serverSocket.setReuseAddress(true); // For being able to use multi-servers
         this.tree = tree;
+        this.consistentHashing = new ConsistentHashing(config);
         System.out.println("Server started");
     }
 
     public void connectToClient() throws IOException {
-        this.socket = serverSocket.accept();
-        System.out.println("Client accepted");
-
-        ClientThreadHandler serverThread = new ClientThreadHandler(socket, this);
+        ClientThreadHandler serverThread = new ClientThreadHandler(serverSocket, this);
         Thread thread = new Thread(serverThread);
         thread.start();
     }

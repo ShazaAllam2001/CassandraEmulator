@@ -7,7 +7,7 @@ TCPports:
   - 4000
   - 5000
 quorum:
-  read: 3
+  read: 2
   write: 3
-replication: 3
+replication: 4
 storeThreshold: 5
