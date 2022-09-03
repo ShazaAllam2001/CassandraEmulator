@@ -4,6 +4,7 @@ public class Configuration {
     private int numNodes;
     private int vNodes;
     private int[] TCPports;
+    private int coordinatorIdx;
     private Quorum quorum;
     private int replication;
     private int storeThreshold;
@@ -27,6 +28,14 @@ public class Configuration {
 
     public void setTCPports(int[] TCPports) {
         this.TCPports = TCPports;
+    }
+
+    public int getCoordinatorIdx() {
+        return coordinatorIdx;
+    }
+
+    public void setCoordinatorIdx(int coordinatorIdx) {
+        this.coordinatorIdx = coordinatorIdx;
     }
 
     public Quorum getQuorum() {

@@ -4,6 +4,8 @@ import helpingTools.yaml.Configuration;
 import helpingTools.yaml.YamlTool;
 
 import java.io.FileNotFoundException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.TreeMap;
 
 public class ConsistentHashing {
@@ -27,8 +29,8 @@ public class ConsistentHashing {
         }
     }
 
-    public int[] getServers(String key) {
-        int[] servers = new int[config.getReplication()];
+    public List<Integer> getServers(String key) {
+        List<Integer> servers = new ArrayList<>();
         Integer nodeKey = key.hashCode(); // token of the given key
         // get all server with that number and (RF-1) servers next to it (clockwise)
         for (int i=0; i<config.getReplication(); i++) {
@@ -42,7 +44,7 @@ public class ConsistentHashing {
             String name = nodePlaces.get(nodeKey);
             // parse the name to get the node number
             int serverNo = Integer.parseInt(name.split("_", 3)[2]);
-            servers[i] = serverNo;
+            servers.add(config.getTCPports()[serverNo]);
         }
         return servers;
     }

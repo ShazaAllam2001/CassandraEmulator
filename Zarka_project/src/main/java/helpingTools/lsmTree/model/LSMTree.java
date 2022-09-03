@@ -10,6 +10,7 @@ import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.TreeMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -28,8 +29,8 @@ public class LSMTree implements ILSMTree {
     // threshold that when we reach it we dump the memtable to a file
     private int storeThreshold;
 
-    // size of segments on the LSM Tree
-    private int indextRange;
+    // size of partitions in segments on the LSM Tree
+    private int partSize;
 
     // memtable before it reaches the store Threshold
     private TreeMap<String, Command> memtable;
@@ -49,7 +50,7 @@ public class LSMTree implements ILSMTree {
     // WAL file
     private File walFile;
 
-    public LSMTree(String directory, int storeThreshold, int indextRange) {
+    public LSMTree(String directory, int storeThreshold, int partSize) {
         try {
             this.directory = dir + directory + "\\";
             // make directory for tree
@@ -58,7 +59,7 @@ public class LSMTree implements ILSMTree {
                 theDir.mkdirs();
             }
             this.storeThreshold = storeThreshold;
-            this.indextRange = indextRange;
+            this.partSize = partSize;
             this.memtableLock = new ReentrantReadWriteLock();
             this.ssTables = new LinkedList<SsTable>();
             this.memtable = new TreeMap<String, Command>();
@@ -77,12 +78,12 @@ public class LSMTree implements ILSMTree {
             TreeMap<Long, SsTable> ssTableTreeMap = new TreeMap<Long, SsTable>(Comparator.reverseOrder());
             for (File file : files) {
                 String fileName = file.getName();
-                //
+                // if the memtable failed to be stored to disk, load it from walTmp
                 if (file.isFile() && fileName.equals(WAL_TMP)) {
                     restoreFromWal(new RandomAccessFile(file, RW_MODE));
                 }
+                // restore last written commands to memtable
                 if (file.isFile() && fileName.equals(WAL)) {
-                    // load the WAL file to main memory
                     this.walFile = file;
                     this.wal = new RandomAccessFile(file, RW_MODE);
                     restoreFromWal(this.wal);
@@ -100,6 +101,10 @@ public class LSMTree implements ILSMTree {
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public LinkedList<SsTable> getSsTables() {
+        return ssTables;
     }
 
     /**
@@ -122,7 +127,7 @@ public class LSMTree implements ILSMTree {
                     this.memtable.put(command.getKey(), command);
                 }
                 start += 4; // the length of int
-                start += valueLen;
+                start += valueLen; // the length of command
             }
             wal.seek(wal.length());
 
@@ -145,13 +150,14 @@ public class LSMTree implements ILSMTree {
             memtable = new TreeMap<String, Command>();
             wal.close();
 
+            // delete walTmp if exists
             File tmpWal = new File(directory + WAL_TMP);
             if (tmpWal.exists()) {
                 if (!tmpWal.delete()) {
                     throw new RuntimeException("Can not delete: walTmp");
                 }
             }
-            // rename the current WAL to "walTmp"
+            // rename the current wal to "walTmp"
             if (!walFile.renameTo(tmpWal)) {
                 throw new RuntimeException("Can not rename: walTmp");
             }
@@ -170,7 +176,7 @@ public class LSMTree implements ILSMTree {
      */
     private void storeToSsTable() {
         try {
-            SsTable ssTable = SsTable.createFromIndex(directory + System.currentTimeMillis() + SEGMENT, indextRange, immutableMemtable);
+            SsTable ssTable = SsTable.createFromMemtable(directory + System.currentTimeMillis() + SEGMENT, partSize, immutableMemtable);
             // add the last added Segment as the first to look on for keys
             ssTables.addFirst(ssTable);
             immutableMemtable = null;
@@ -183,6 +189,62 @@ public class LSMTree implements ILSMTree {
             }
         } catch (Throwable e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    private Command searchSstable(String k, List<JSONObject> segmentParts) {
+        for(JSONObject part : segmentParts) {
+            for(String key : part.keySet()) {
+                if(k.equals(key)) {
+                    return ConvertUtil.jsonToCommand(part.getJSONObject(k));
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * compact two ssTables
+     *
+     * @param ssTable1 the previous to the most recent
+     * @param ssTable2 the most recent
+     */
+    public void compact(SsTable ssTable1, SsTable ssTable2) {
+        try {
+            List<JSONObject> segmentParts1 = ssTable1.getSegmentRecords();
+            List<JSONObject> segmentParts2 = ssTable2.getSegmentRecords();
+
+            TreeMap<String,Command> newSsTable = new TreeMap<>();
+
+            //
+            for(JSONObject part : segmentParts1) {
+                for(String key : part.keySet()) {
+                    Command value = searchSstable(key, segmentParts2);
+                    if(value != null) {
+                        continue;
+                    }
+                    newSsTable.put(key, ConvertUtil.jsonToCommand(part.getJSONObject(key)));
+                }
+            }
+            for(JSONObject part : segmentParts2) {
+                for(String key : part.keySet()) {
+                    newSsTable.put(key, ConvertUtil.jsonToCommand(part.getJSONObject(key)));
+                }
+            }
+            // put new SsTable in Sstable1 file path
+            SsTable.createFromMemtable(ssTable1.getFilePath(), partSize, newSsTable);
+            // close & delete SsTable2
+            ssTable2.getSegmentFile().close();
+            this.getSsTables().remove(ssTable2);
+            File SsTable2Path = new File(ssTable2.getFilePath());
+            if (SsTable2Path.exists()) {
+                if (!SsTable2Path.delete()) {
+                    throw new RuntimeException("Can not delete: " + SsTable2Path.getName());
+                }
+            }
+
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
         }
     }
 
@@ -205,7 +267,7 @@ public class LSMTree implements ILSMTree {
             memtable.put(key, command);
 
             // if memtable reaches its threshold dump it to a file
-            if (memtable.size() > storeThreshold) {
+            if (memtable.size() >= storeThreshold) {
                 switchMemtable();
                 storeToSsTable();
             }

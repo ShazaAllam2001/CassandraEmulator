@@ -2,41 +2,43 @@ package clientServer;
 
 import helpingTools.lsmTree.model.LSMTree;
 import helpingTools.yaml.Configuration;
+import helpingTools.yaml.YamlTool;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.util.List;
 
 public class ServerStart {
 
     public static Server[] startCluster(Configuration config) throws IOException {
         Server[] servers = new Server[config.getNumNodes()];
-        // create servers & connect server[0] (coordinator) to other servers
+        // create servers
         for (int i=0; i<config.getNumNodes(); i++) {
-            LSMTree tree = new LSMTree("server_" + i + "_Tree", config.getStoreThreshold(), 5);
-            servers[i] = new Server(config.getTCPports()[i],tree,config);
-            if (i!=0) {
-                servers[0].connectToServer(servers[i]);
-            }else {
-                servers[0].connectToClient();
-            }
+            servers[i] = new Server(config.getTCPports()[i],config);
         }
-        /*for(int i=0; i<config.getNumNodes(); i++) {
-            for(int j=i+1; j<config.getNumNodes(); j++) {
+        // connect servers together
+        for(int i=0; i<config.getNumNodes(); i++) {
+            for(int j=0; j<config.getNumNodes(); j++) {
                 if(i!=j) {
                     servers[i].connectToServer(servers[j]);
-                    servers[j].connectToServer(servers[i]);
                 }
             }
-            servers[i].connectToClient();
-        }*/
+        }
+        // connect servers to the client
+        for(int i=0; i<config.getNumNodes(); i++) {
+            servers[i].connectToClient(i);
+        }
 
         return servers;
     }
 
-    public static Socket startServer(int port) throws IOException {
+    public static Socket startServer(int port, int i) throws IOException {
+        Configuration config = YamlTool.readYaml("config.yaml");
+        LSMTree tree = new LSMTree("server_" + i + "_Tree", config.getStoreThreshold(), 5);
+
         // establish a connection by providing host and port number
         Socket socket = new Socket("127.0.0.1", port);
 
@@ -46,7 +48,7 @@ public class ServerStart {
         // reading from server
         BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-        String receiveMessage;
+        String receiveMessage, sendMessage;
         while(true) {
             receiveMessage = in.readLine(); // receive from coordinator
             if(receiveMessage == "Exit") {
@@ -58,10 +60,11 @@ public class ServerStart {
                 break;
             }
             if(receiveMessage != null) {
-
-                //////
-                System.out.println(receiveMessage);
-                out.println(receiveMessage); // send to coordinator
+                System.out.println("Received message from server port " + port + " = " + receiveMessage);
+                // parse & execute command
+                List<String> parsedCommand = ClientCommand.parseCommand(receiveMessage);
+                sendMessage = ClientCommand.executeCommand(parsedCommand, tree);
+                out.println(sendMessage); // send to coordinator
             }
         }
 

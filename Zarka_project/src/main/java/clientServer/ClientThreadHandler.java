@@ -1,5 +1,9 @@
 package clientServer;
 
+import helpingTools.lsmTree.model.LSMTree;
+import helpingTools.yaml.Configuration;
+import helpingTools.yaml.YamlTool;
+
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -9,15 +13,20 @@ public class ClientThreadHandler implements Runnable {
     private final ServerSocket serverSocket;
     private final Server coordinator;
     private Socket socket;
+    private final int i;
 
-    public ClientThreadHandler(ServerSocket serverSocket, Server coordinator) {
+    public ClientThreadHandler(ServerSocket serverSocket, Server coordinator, int i) {
         this.serverSocket = serverSocket;
         this.coordinator = coordinator;
+        this.i = i;
     }
 
     @Override
     public void run() {
         try {
+            Configuration config = YamlTool.readYaml("config.yaml");
+            LSMTree tree = new LSMTree("server_" + i + "_Tree", config.getStoreThreshold(), 5);
+
             this.socket = serverSocket.accept();
             System.out.println("Client accepted");
 
@@ -40,29 +49,36 @@ public class ClientThreadHandler implements Runnable {
                     coordinator.in.close();
                     break;
                 }
-                if(receiveMessage  != null) {
-                    System.out.println(receiveMessage);
+
+                if(receiveMessage != null) {
+                    System.out.println("Server port " + coordinator.port + ": Received message from client = " + receiveMessage);
+                    coordinator.servers.get(0).out.println(receiveMessage);
                     // parse & execute command
-                    List<String> parsedCommand = ClientCommand.parseCommand(receiveMessage);
+                    /*List<String> parsedCommand = ClientCommand.parseCommand(receiveMessage);
                     // get nums of servers associated with the key
                     if(!parsedCommand.get(0).equals("Invalid Command!")) {
-                        int[] serversNums = coordinator.consistentHashing.getServers(parsedCommand.get(1));
+                        List<Integer> serversPorts = coordinator.consistentHashing.getServers(parsedCommand.get(1));
                         // if the key exists in the coordinator
-                        if(serversNums[0] == 0) {
-                            sendMessage = ClientCommand.executeCommand(parsedCommand, coordinator.tree);
+                        if(serversPorts.contains(config.getTCPports()[config.getCoordinatorIdx()])) {
+                            sendMessage = ClientCommand.executeCommand(parsedCommand, tree);
                             coordinator.out.println(sendMessage);
                             coordinator.out.flush();
                         }
                         else {
-                            int serverToAsk = serversNums[0];
+                            int portToAsk = serversPorts.get(0);
                             // send request to the first server that has the key
-                            coordinator.servers.get(serverToAsk-1).out.println(receiveMessage);
+                            for(int i=0; i<coordinator.servers.size(); i++) {
+                                if(portToAsk == coordinator.servers.get(i).port) {
+                                    coordinator.servers.get(i).out.println(receiveMessage);
+                                    break;
+                                }
+                            }
                         }
-                    } else {
+                    }*/ /*else {
                         sendMessage = "Invalid Command!";
                         coordinator.out.println(sendMessage);
                         coordinator.out.flush();
-                    }
+                    }*/
                 }
             }
         }
@@ -76,7 +92,6 @@ public class ClientThreadHandler implements Runnable {
                 }
                 if (coordinator.in != null) {
                     coordinator.in.close();
-                    //clientSocket.close();
                 }
             }
             catch (IOException e) {

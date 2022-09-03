@@ -8,17 +8,19 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Optional;
 import java.util.TreeMap;
 
 public class SsTable implements Closeable {
     public static final String RW = "rw";
+    public static final int segmentMaxSize = 500;
 
     private TableMetaInfo tableMetaInfo;
 
     private TreeMap<String, Position> sparseIndex;
 
-    private final RandomAccessFile tableFile;
+    private final RandomAccessFile segmentFile;
 
     private final String filePath;
 
@@ -28,29 +30,85 @@ public class SsTable implements Closeable {
         this.tableMetaInfo.setPartSize(partSize);
         this.filePath = filePath;
         try {
-            this.tableFile = new RandomAccessFile(filePath, RW);
-            tableFile.seek(0);
+            this.segmentFile = new RandomAccessFile(filePath, RW);
+            segmentFile.seek(0);
         } catch (Throwable t) {
             throw new RuntimeException(t);
         }
         sparseIndex = new TreeMap<>();
     }
 
+    public TreeMap<String, Position> getSparseIndex() {
+        return sparseIndex;
+    }
+
+    public RandomAccessFile getSegmentFile() {
+        return segmentFile;
+    }
+
+    public String getFilePath() {
+        return filePath;
+    }
+
     /**
-     * 从内存表中构建ssTable
+     * create SStable from memtable
      * @param filePath
      * @param partSize
-     * @param index
+     * @param memtable
      * @return
      */
-    public static SsTable createFromIndex(String filePath, int partSize, TreeMap<String, Command> index) {
+    public static SsTable createFromMemtable(String filePath, int partSize, TreeMap<String, Command> memtable) {
         SsTable ssTable = new SsTable(filePath, partSize);
-        ssTable.initFromIndex(index);
+        ssTable.initFromMemtable(memtable);
         return ssTable;
     }
 
     /**
-     * 从文件中构建ssTable
+     * initialize Sstable from memtable
+     * @param memtable
+     */
+    private void initFromMemtable(TreeMap<String, Command> memtable) {
+        try {
+            JSONObject partData = new JSONObject(true);
+            tableMetaInfo.setDataStart(segmentFile.getFilePointer());
+            for (Command command : memtable.values()) {
+                if (command instanceof SetCommand) {
+                    SetCommand set = (SetCommand) command;
+                    partData.put(set.getKey(), set);
+                }
+                if (command instanceof RmCommand) {
+                    RmCommand rm = (RmCommand) command;
+                    partData.put(rm.getKey(), rm);
+                }
+
+                // if we reach the partition size, write this part
+                if (partData.size() >= tableMetaInfo.getPartSize()) {
+                    writeDataPart(partData);
+                }
+            }
+            // write the last a partition of data
+            if (partData.size() > 0) {
+                writeDataPart(partData);
+            }
+            long dataPartLen = segmentFile.getFilePointer() - tableMetaInfo.getDataStart();
+            tableMetaInfo.setDataLen(dataPartLen);
+
+            // write sparse index
+            byte[] indexBytes = JSONObject.toJSONString(sparseIndex).getBytes(StandardCharsets.UTF_8);
+            tableMetaInfo.setIndexStart(segmentFile.getFilePointer());
+            segmentFile.write(indexBytes);
+            tableMetaInfo.setIndexLen(indexBytes.length);
+
+            // write table info
+            tableMetaInfo.writeToFile(segmentFile);
+
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+    }
+
+    /**
+     * create Sstable form file
      * @param filePath
      * @return
      */
@@ -61,7 +119,43 @@ public class SsTable implements Closeable {
     }
 
     /**
-     * 从ssTable中查询数据
+     * read Sstable form file
+     */
+    private void restoreFromFile() {
+        try {
+            // read table info and sparse index from file
+            TableMetaInfo tableMetaInfo = TableMetaInfo.readFromFile(segmentFile);
+            byte[] indexBytes = new byte[(int) tableMetaInfo.getIndexLen()];
+            segmentFile.seek(tableMetaInfo.getIndexStart());
+            segmentFile.read(indexBytes);
+            String indexStr = new String(indexBytes, StandardCharsets.UTF_8);
+            sparseIndex = JSONObject.parseObject(indexStr,
+                    new TypeReference<TreeMap<String, Position>>() {
+                    });
+            this.tableMetaInfo = tableMetaInfo;
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+    }
+
+    /**
+     * write a partition of data in the segment
+     * @param partData
+     * @throws IOException
+     */
+    private void writeDataPart(JSONObject partData) throws IOException {
+        byte[] partDataBytes = partData.toJSONString().getBytes(StandardCharsets.UTF_8);
+        long start = segmentFile.getFilePointer();
+        segmentFile.write(partDataBytes);
+
+        // write index associated to this DataPart
+        Optional<String> firstKey = partData.keySet().stream().findFirst();
+        firstKey.ifPresent(s -> sparseIndex.put(s, new Position(start, partDataBytes.length)));
+        partData.clear();
+    }
+
+    /**
+     * query from SsTable
      * @param key
      * @return
      */
@@ -69,10 +163,9 @@ public class SsTable implements Closeable {
         try {
             LinkedList<Position> sparseKeyPositionList = new LinkedList<>();
 
-            Position lastSmallPosition = null;
-            Position firstBigPosition = null;
+            Position lastSmallPosition = null; // last position before or equal the key
+            Position firstBigPosition = null; // first position after the key
 
-            //从稀疏索引中找到最后一个小于key的位置，以及第一个大于key的位置
             for (String k : sparseIndex.keySet()) {
                 if (k.compareTo(key) <= 0) {
                     lastSmallPosition = sparseIndex.get(k);
@@ -87,9 +180,11 @@ public class SsTable implements Closeable {
             if (firstBigPosition != null) {
                 sparseKeyPositionList.add(firstBigPosition);
             }
+            // if the key that does not exist in the segment
             if (sparseKeyPositionList.size() == 0) {
                 return null;
             }
+
             Position firstKeyPosition = sparseKeyPositionList.getFirst();
             Position lastKeyPosition = sparseKeyPositionList.getLast();
             long start = 0;
@@ -100,12 +195,12 @@ public class SsTable implements Closeable {
             } else {
                 len = lastKeyPosition.getStart() + lastKeyPosition.getLen() - start;
             }
-            //key如果存在必定位于区间内，所以只需要读取区间内的数据，减少io
+            // read dataPart with start and length pointed to by the index
             byte[] dataPart = new byte[(int) len];
-            tableFile.seek(start);
-            tableFile.read(dataPart);
+            segmentFile.seek(start);
+            segmentFile.read(dataPart);
             int pStart = 0;
-            //读取分区数据
+            //
             for (Position position : sparseKeyPositionList) {
                 JSONObject dataPartJson = JSONObject.parseObject(new String(dataPart, pStart, (int) position.getLen()));
                 if (dataPartJson.containsKey(key)) {
@@ -118,95 +213,29 @@ public class SsTable implements Closeable {
         } catch (Throwable t) {
             throw new RuntimeException(t);
         }
-
     }
 
-    /**
-     * 从文件中恢复ssTable到内存
-     */
-    private void restoreFromFile() {
-        try {
-            //先读取索引
-            TableMetaInfo tableMetaInfo = TableMetaInfo.readFromFile(tableFile);
-            //读取稀疏索引
-            byte[] indexBytes = new byte[(int) tableMetaInfo.getIndexLen()];
-            tableFile.seek(tableMetaInfo.getIndexStart());
-            tableFile.read(indexBytes);
-            String indexStr = new String(indexBytes, StandardCharsets.UTF_8);
-            sparseIndex = JSONObject.parseObject(indexStr,
-                    new TypeReference<TreeMap<String, Position>>() {
-                    });
-            this.tableMetaInfo = tableMetaInfo;
-        } catch (Throwable t) {
-            throw new RuntimeException(t);
+    public List<JSONObject> getSegmentRecords() throws IOException {
+        LinkedList<JSONObject> segmentRecords = new LinkedList<>();
+
+        long start;
+        long len;
+        for(String k : this.getSparseIndex().keySet()) {
+            Position partPosition = this.getSparseIndex().get(k);
+            start = partPosition.getStart();
+            len = partPosition.getLen();
+
+            byte[] dataPart = new byte[(int) len];
+            this.getSegmentFile().seek(start);
+            this.getSegmentFile().read(dataPart);
+            JSONObject dataPartJson = JSONObject.parseObject(new String(dataPart));
+            segmentRecords.add(dataPartJson);
         }
-
-
-    }
-
-    /**
-     * 从内存表转化为ssTable
-     * @param index
-     */
-    private void initFromIndex(TreeMap<String, Command> index) {
-        try {
-            JSONObject partData = new JSONObject(true);
-            tableMetaInfo.setDataStart(tableFile.getFilePointer());
-            for (Command command : index.values()) {
-                //处理set命令
-                if (command instanceof SetCommand) {
-                    SetCommand set = (SetCommand) command;
-                    partData.put(set.getKey(), set);
-                }
-                //处理rm命令
-                if (command instanceof RmCommand) {
-                    RmCommand rm = (RmCommand) command;
-                    partData.put(rm.getKey(), rm);
-                }
-
-                //达到分段数量，开始写入数据段
-                if (partData.size() >= tableMetaInfo.getPartSize()) {
-                    writeDataPart(partData);
-                }
-            }
-            //遍历完之后如果有剩余的数据（尾部数据不一定达到分段条件）写入文件
-            if (partData.size() > 0) {
-                writeDataPart(partData);
-            }
-            long dataPartLen = tableFile.getFilePointer() - tableMetaInfo.getDataStart();
-            tableMetaInfo.setDataLen(dataPartLen);
-            //保存稀疏索引
-            byte[] indexBytes = JSONObject.toJSONString(sparseIndex).getBytes(StandardCharsets.UTF_8);
-            tableMetaInfo.setIndexStart(tableFile.getFilePointer());
-            tableFile.write(indexBytes);
-            tableMetaInfo.setIndexLen(indexBytes.length);
-
-            //保存文件索引
-            tableMetaInfo.writeToFile(tableFile);
-
-        } catch (Throwable t) {
-            throw new RuntimeException(t);
-        }
-    }
-
-    /**
-     * 将数据分区写入文件
-     * @param partData
-     * @throws IOException
-     */
-    private void writeDataPart(JSONObject partData) throws IOException {
-        byte[] partDataBytes = partData.toJSONString().getBytes(StandardCharsets.UTF_8);
-        long start = tableFile.getFilePointer();
-        tableFile.write(partDataBytes);
-
-        //记录数据段的第一个key到稀疏索引中
-        Optional<String> firstKey = partData.keySet().stream().findFirst();
-        firstKey.ifPresent(s -> sparseIndex.put(s, new Position(start, partDataBytes.length)));
-        partData.clear();
+        return segmentRecords;
     }
 
     @Override
     public void close() throws IOException {
-        tableFile.close();
+        segmentFile.close();
     }
 }

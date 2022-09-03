@@ -1,5 +1,7 @@
 package helpingTools.lsmTree.treeUtils;
 
+import java.util.Objects;
+
 public class Position {
 
     private long start;
@@ -26,4 +28,13 @@ public class Position {
     public void setLen(long len) {
         this.len = len;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Position)) return false;
+        Position position = (Position) o;
+        return start == position.start && len == position.len;
+    }
+
 }
