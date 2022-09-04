@@ -2,11 +2,12 @@ package helpingTools.lsmTree.model;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.google.common.hash.BloomFilter;
+import com.google.common.hash.Funnels;
 import helpingTools.lsmTree.treeUtils.*;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.io.*;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.LinkedList;
@@ -21,6 +22,7 @@ public class LSMTree implements ILSMTree {
     public static final String SEGMENT = ".segment";
     public static final String WAL = "wal";
     public static final String WAL_TMP = "walTmp";
+    public static final String BLOOM_FILTER = "bloomFilter";
     public static final String RW_MODE = "rw"; // Read Write mode
 
     // directory where we write the LSM Tree
@@ -31,6 +33,8 @@ public class LSMTree implements ILSMTree {
 
     // size of partitions in segments on the LSM Tree
     private int partSize;
+
+    private BloomFilter<String> filter;
 
     // memtable before it reaches the store Threshold
     private TreeMap<String, Command> memtable;
@@ -79,21 +83,28 @@ public class LSMTree implements ILSMTree {
             for (File file : files) {
                 String fileName = file.getName();
                 // if the memtable failed to be stored to disk, load it from walTmp
-                if (file.isFile() && fileName.equals(WAL_TMP)) {
+                if (file.isFile() && fileName.equals(BLOOM_FILTER)) {
+                    deserializeBloomFilter();
+                }
+                else if (file.isFile() && fileName.equals(WAL_TMP)) {
                     restoreFromWal(new RandomAccessFile(file, RW_MODE));
                 }
                 // restore last written commands to memtable
-                if (file.isFile() && fileName.equals(WAL)) {
+                else if (file.isFile() && fileName.equals(WAL)) {
                     this.walFile = file;
                     this.wal = new RandomAccessFile(file, RW_MODE);
                     restoreFromWal(this.wal);
                 }
+                // get SsTables
                 else if (file.isFile() && fileName.endsWith(SEGMENT)) {
                     // load the segments into main memory & put them into a TreeMap
                     int dotIndex = fileName.indexOf(".");
                     Long time = Long.parseLong(fileName.substring(0, dotIndex));
                     ssTableTreeMap.put(time, SsTable.createFromFile(file.getAbsolutePath()));
                 }
+            }
+            if(filter == null) {
+                this.filter = BloomFilter.create(Funnels.stringFunnel(Charset.forName("UTF-8")),10000);
             }
             // put the segments on the TreeMap to a LinkedList
             this.ssTables.addAll(ssTableTreeMap.values());
@@ -125,6 +136,7 @@ public class LSMTree implements ILSMTree {
                 Command command = ConvertUtil.jsonToCommand(value);
                 if (command != null) {
                     this.memtable.put(command.getKey(), command);
+                    this.filter.put(command.getKey());
                 }
                 start += 4; // the length of int
                 start += valueLen; // the length of command
@@ -177,6 +189,7 @@ public class LSMTree implements ILSMTree {
     private void storeToSsTable() {
         try {
             SsTable ssTable = SsTable.createFromMemtable(directory + System.currentTimeMillis() + SEGMENT, partSize, immutableMemtable);
+            serializeBloomFilter();
             // add the last added Segment as the first to look on for keys
             ssTables.addFirst(ssTable);
             immutableMemtable = null;
@@ -192,6 +205,38 @@ public class LSMTree implements ILSMTree {
         }
     }
 
+    /**
+     * Store the current bloom filter as a file
+     */
+    private void serializeBloomFilter() {
+        try {
+            File filterFile = new File(directory + BLOOM_FILTER);
+            OutputStream filterStream = new FileOutputStream(filterFile);
+            filter.writeTo(filterStream);
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * read the current bloom filter from file
+     */
+    private void deserializeBloomFilter() {
+        try {
+            File filterFile = new File(directory + BLOOM_FILTER);
+            InputStream filterStream = new FileInputStream(filterFile);
+            filter = BloomFilter.readFrom(filterStream,Funnels.stringFunnel(Charset.forName("UTF-8")));
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * search for k in segmentParts & return its value
+     *
+     * @param k
+     * @param segmentParts
+    * */
     private Command searchSstable(String k, List<JSONObject> segmentParts) {
         for(JSONObject part : segmentParts) {
             for(String key : part.keySet()) {
@@ -201,6 +246,60 @@ public class LSMTree implements ILSMTree {
             }
         }
         return null;
+    }
+
+    /**
+     * create the compacted segment from ssTable1 and ssTable2 from newMemTable
+     *
+     * @param ssTable1
+     * @param ssTable2
+     * @param newMemTable
+     */
+    private void createCompactedSegment(SsTable ssTable1, SsTable ssTable2, TreeMap<String,Command> newMemTable) {
+        try {
+            // create newSsTable
+            SsTable newSsTable = SsTable.createFromMemtable(directory + "tmp" + SEGMENT, partSize, newMemTable);
+            /* lock Reading while replacing files */
+            memtableLock.readLock().lock();
+            // close & delete SsTable1
+            ssTable1.getSegmentFile().close();
+            File SsTable1Path = new File(ssTable1.getFilePath());
+            if (SsTable1Path.exists()) {
+                if (!SsTable1Path.delete()) {
+                    throw new RuntimeException("Can not delete: " + SsTable1Path.getName());
+                }
+            }
+
+            // rename tmp file to the name of SsTable1
+            newSsTable.getSegmentFile().close();
+            File newSsTablePath = new File(newSsTable.getFilePath());
+            if (newSsTablePath.exists()) {
+                if (!newSsTablePath.renameTo(SsTable1Path)) {
+                    throw new RuntimeException("Can not rename: " + newSsTablePath.getName());
+                }
+            }
+            newSsTable.setFilePath(ssTable1.getFilePath());
+            newSsTable.setSegmentFile(new RandomAccessFile(newSsTable.getFilePath(), RW_MODE));
+
+            // replace newSsTable in place of ssTable1
+            int indexSs1 = this.getSsTables().indexOf(ssTable1);
+            this.getSsTables().set(indexSs1, newSsTable);
+
+            // close & delete SsTable2
+            ssTable2.getSegmentFile().close();
+            this.getSsTables().remove(ssTable2);
+            File SsTable2Path = new File(ssTable2.getFilePath());
+            if (SsTable2Path.exists()) {
+                if (!SsTable2Path.delete()) {
+                    throw new RuntimeException("Can not delete: " + SsTable2Path.getName());
+                }
+            }
+
+        } catch(Throwable t) {
+            throw new RuntimeException(t);
+        } finally {
+            memtableLock.readLock().unlock();
+        }
     }
 
     /**
@@ -214,34 +313,25 @@ public class LSMTree implements ILSMTree {
             List<JSONObject> segmentParts1 = ssTable1.getSegmentRecords();
             List<JSONObject> segmentParts2 = ssTable2.getSegmentRecords();
 
-            TreeMap<String,Command> newSsTable = new TreeMap<>();
+            TreeMap<String,Command> newMemTable = new TreeMap<>();
 
-            //
+            // search key on ssTable1 on that appear in ssTable2
             for(JSONObject part : segmentParts1) {
                 for(String key : part.keySet()) {
                     Command value = searchSstable(key, segmentParts2);
                     if(value != null) {
                         continue;
                     }
-                    newSsTable.put(key, ConvertUtil.jsonToCommand(part.getJSONObject(key)));
+                    newMemTable.put(key, ConvertUtil.jsonToCommand(part.getJSONObject(key)));
                 }
             }
             for(JSONObject part : segmentParts2) {
                 for(String key : part.keySet()) {
-                    newSsTable.put(key, ConvertUtil.jsonToCommand(part.getJSONObject(key)));
+                    newMemTable.put(key, ConvertUtil.jsonToCommand(part.getJSONObject(key)));
                 }
             }
-            // put new SsTable in Sstable1 file path
-            SsTable.createFromMemtable(ssTable1.getFilePath(), partSize, newSsTable);
-            // close & delete SsTable2
-            ssTable2.getSegmentFile().close();
-            this.getSsTables().remove(ssTable2);
-            File SsTable2Path = new File(ssTable2.getFilePath());
-            if (SsTable2Path.exists()) {
-                if (!SsTable2Path.delete()) {
-                    throw new RuntimeException("Can not delete: " + SsTable2Path.getName());
-                }
-            }
+
+            createCompactedSegment(ssTable1, ssTable2, newMemTable);
 
         } catch (Throwable t) {
             throw new RuntimeException(t);
@@ -265,6 +355,7 @@ public class LSMTree implements ILSMTree {
             wal.writeInt(commandBytes.length);
             wal.write(commandBytes);
             memtable.put(key, command);
+            filter.put(key);
 
             // if memtable reaches its threshold dump it to a file
             if (memtable.size() >= storeThreshold) {
@@ -295,10 +386,12 @@ public class LSMTree implements ILSMTree {
                 command = immutableMemtable.get(key);
             }
             if (command == null) {
-                for (SsTable ssTable : ssTables) {
-                    command = ssTable.query(key);
-                    if (command != null) {
-                        break;
+                if(filter.mightContain(key)) {
+                    for (SsTable ssTable : ssTables) {
+                        command = ssTable.query(key);
+                        if (command != null) {
+                            break;
+                        }
                     }
                 }
             }
@@ -333,8 +426,9 @@ public class LSMTree implements ILSMTree {
             wal.writeInt(commandBytes.length);
             wal.write(commandBytes);
             memtable.put(key, rmCommand);
+
             // if memtable reaches its threshold dump it to a file
-            if (memtable.size() > storeThreshold) {
+            if (memtable.size() >= storeThreshold) {
                 switchMemtable();
                 storeToSsTable();
             }

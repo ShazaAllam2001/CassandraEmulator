@@ -20,9 +20,9 @@ public class SsTable implements Closeable {
 
     private TreeMap<String, Position> sparseIndex;
 
-    private final RandomAccessFile segmentFile;
+    private RandomAccessFile segmentFile;
 
-    private final String filePath;
+    private String filePath;
 
 
     private SsTable(String filePath, int partSize) {
@@ -42,8 +42,16 @@ public class SsTable implements Closeable {
         return sparseIndex;
     }
 
+    public void setSegmentFile(RandomAccessFile segmentFile) {
+        this.segmentFile = segmentFile;
+    }
+
     public RandomAccessFile getSegmentFile() {
         return segmentFile;
+    }
+
+    public void setFilePath(String filePath) {
+        this.filePath = filePath;
     }
 
     public String getFilePath() {

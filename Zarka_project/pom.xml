@@ -31,6 +31,13 @@
             <artifactId>flogger</artifactId>
             <version>0.7.4</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>31.1-jre</version>
+        </dependency>
+
     </dependencies>
     
 </project>
