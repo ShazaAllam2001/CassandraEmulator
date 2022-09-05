@@ -1,20 +1,20 @@
 package clientServer;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import helpingTools.yaml.Configuration;
+import helpingTools.yaml.YamlTool;
+
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 
 public class ServerThreadHandler implements Runnable {
     private final ServerSocket serverSocket;
-    private final Server server;
+    private final Server serverRequester;
     private final Server coordinator;
 
-    public ServerThreadHandler(ServerSocket serverSocket, Server server, Server coordinator) {
+    public ServerThreadHandler(ServerSocket serverSocket, Server serverRequester, Server coordinator) {
         this.serverSocket = serverSocket;
-        this.server = server;
+        this.serverRequester = serverRequester;
         this.coordinator = coordinator;
     }
 
@@ -25,15 +25,17 @@ public class ServerThreadHandler implements Runnable {
             System.out.println("New Server Connected");
 
             // get the inputstream of other server (client)
-            server.in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            serverRequester.in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
             // get the outputstream of other server (client)
-            server.out = new PrintWriter(socket.getOutputStream(), true);
+            serverRequester.out = new PrintWriter(socket.getOutputStream(), true);
 
             String line;
-            while ((line = server.in.readLine()) != null) {
+            while ((line = serverRequester.in.readLine()) != null) {
+                Configuration config = YamlTool.readYaml("config.yaml");;
                 // output the received message from other server (client) to the client
-                System.out.println("Server port " + coordinator.port + ": Received message from server " + server.port + " = " + line);
+                System.out.println("Server port " + serverSocket.getLocalPort()
+                                    + ": Received message from server " + serverRequester.port + " = " + line);
                 coordinator.out.println(line);
             }
         }
@@ -42,11 +44,11 @@ public class ServerThreadHandler implements Runnable {
         }
         finally {
             try {
-                if (coordinator.out != null) {
-                    coordinator.out.close();
+                if (serverRequester.out != null) {
+                    serverRequester.out.close();
                 }
-                if (server.in != null) {
-                    server.in.close();
+                if (serverRequester.in != null) {
+                    serverRequester.in.close();
                     //clientSocket.close();
                 }
             }

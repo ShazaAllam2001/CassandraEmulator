@@ -7,7 +7,6 @@ import helpingTools.yaml.YamlTool;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.List;
 
 public class ClientThreadHandler implements Runnable {
     private final ServerSocket serverSocket;
@@ -24,19 +23,17 @@ public class ClientThreadHandler implements Runnable {
     @Override
     public void run() {
         try {
-            Configuration config = YamlTool.readYaml("config.yaml");
-            LSMTree tree = new LSMTree("server_" + i + "_Tree", config.getStoreThreshold(), 5);
+            //Configuration config = YamlTool.readYaml("config.yaml");
+            //LSMTree tree = new LSMTree("server_" + i + "_Tree", config.getStoreThreshold(), 5);
 
             this.socket = serverSocket.accept();
             System.out.println("Client accepted");
 
             // sending to client (pwrite object)
-            OutputStream ostream = socket.getOutputStream();
-            coordinator.out = new PrintWriter(ostream, true);
+            coordinator.out = new PrintWriter(socket.getOutputStream(), true);
 
             // receiving from server (receiveRead  object)
-            InputStream istream = socket.getInputStream();
-            coordinator.in = new BufferedReader(new InputStreamReader(istream));
+            coordinator.in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
             String receiveMessage, sendMessage;
             while(true) {

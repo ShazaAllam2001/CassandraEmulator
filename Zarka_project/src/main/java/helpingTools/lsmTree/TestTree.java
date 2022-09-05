@@ -8,7 +8,7 @@ public class TestTree {
     public static void main(String args[]) {
         LSMTree obj = new LSMTree("testTree3", 10, 5);
 
-        /*obj.set("10", "test1");
+        obj.set("10", "test1");
         obj.set("20", "test2");//
         obj.set("70", "test7");//
         obj.set("40", "test4");
@@ -34,7 +34,7 @@ public class TestTree {
         obj.set("400", "test400");
         obj.set("500", "test500");
         obj.remove("10");
-        obj.remove("20");*/
+        obj.remove("20");
         System.out.println(obj.get("44"));
 
         //obj.compact(obj.getSsTables().get(1),obj.getSsTables().get(0));

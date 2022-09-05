@@ -9,6 +9,8 @@ import helpingTools.lsmTree.treeUtils.*;
 import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
@@ -67,6 +69,7 @@ public class LSMTree implements ILSMTree {
             this.memtableLock = new ReentrantReadWriteLock();
             this.ssTables = new LinkedList<SsTable>();
             this.memtable = new TreeMap<String, Command>();
+            this.filter = BloomFilter.create(Funnels.stringFunnel(Charset.forName("UTF-8")),10000);
 
             // get all the previous segments of the LSM Tree
             File dir = new File(this.directory);
@@ -77,16 +80,38 @@ public class LSMTree implements ILSMTree {
                 this.wal = new RandomAccessFile(walFile, RW_MODE);
                 return;
             }
+            // restore Bloom filter
+            for (File file : files) {
+                String fileName = file.getName();
+                if (file.isFile() && fileName.equals(BLOOM_FILTER)) {
+                    deserializeBloomFilter();
+                    break;
+                }
+            }
+            getPreviousSsTables(files);
 
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public LinkedList<SsTable> getSsTables() {
+        return ssTables;
+    }
+
+    /**
+     *  get all previous SsTables
+     *
+     * @param files
+     */
+    private void getPreviousSsTables(File[] files) {
+        try {
             // put all previous SsTables on a TreeMap and sort them in reverse order
             TreeMap<Long, SsTable> ssTableTreeMap = new TreeMap<Long, SsTable>(Comparator.reverseOrder());
             for (File file : files) {
                 String fileName = file.getName();
                 // if the memtable failed to be stored to disk, load it from walTmp
-                if (file.isFile() && fileName.equals(BLOOM_FILTER)) {
-                    deserializeBloomFilter();
-                }
-                else if (file.isFile() && fileName.equals(WAL_TMP)) {
+                if (file.isFile() && fileName.equals(WAL_TMP)) {
                     restoreFromWal(new RandomAccessFile(file, RW_MODE));
                 }
                 // restore last written commands to memtable
@@ -103,19 +128,12 @@ public class LSMTree implements ILSMTree {
                     ssTableTreeMap.put(time, SsTable.createFromFile(file.getAbsolutePath()));
                 }
             }
-            if(filter == null) {
-                this.filter = BloomFilter.create(Funnels.stringFunnel(Charset.forName("UTF-8")),10000);
-            }
             // put the segments on the TreeMap to a LinkedList
             this.ssTables.addAll(ssTableTreeMap.values());
 
-        } catch (Throwable e) {
-            throw new RuntimeException(e);
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
         }
-    }
-
-    public LinkedList<SsTable> getSsTables() {
-        return ssTables;
     }
 
     /**
@@ -157,7 +175,6 @@ public class LSMTree implements ILSMTree {
      */
     private void switchMemtable() {
         try {
-            memtableLock.writeLock().lock();
             immutableMemtable = memtable;
             memtable = new TreeMap<String, Command>();
             wal.close();
@@ -171,15 +188,13 @@ public class LSMTree implements ILSMTree {
             }
             // rename the current wal to "walTmp"
             if (!walFile.renameTo(tmpWal)) {
-                throw new RuntimeException("Can not rename: walTmp");
+                throw new RuntimeException("Can not rename: wal file to walTmp");
             }
             // reference a new WAL file for the new segment
             walFile = new File(directory + WAL);
             wal = new RandomAccessFile(walFile, RW_MODE);
         } catch (Throwable e) {
             throw new RuntimeException(e);
-        } finally {
-            memtableLock.writeLock().unlock();
         }
     }
 

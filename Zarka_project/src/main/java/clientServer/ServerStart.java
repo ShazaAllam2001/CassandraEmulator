@@ -2,7 +2,6 @@ package clientServer;
 
 import helpingTools.lsmTree.model.LSMTree;
 import helpingTools.yaml.Configuration;
-import helpingTools.yaml.YamlTool;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -35,10 +34,7 @@ public class ServerStart {
         return servers;
     }
 
-    public static Socket startServer(int port, int i) throws IOException {
-        Configuration config = YamlTool.readYaml("config.yaml");
-        LSMTree tree = new LSMTree("server_" + i + "_Tree", config.getStoreThreshold(), 5);
-
+    public static Socket startServer(int port, LSMTree tree) throws IOException {
         // establish a connection by providing host and port number
         Socket socket = new Socket("127.0.0.1", port);
 

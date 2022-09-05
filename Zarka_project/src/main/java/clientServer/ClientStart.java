@@ -14,8 +14,9 @@ public class ClientStart {
         // choose the random server to connect to
         /*Random random = new Random();
         int rn = random.nextInt(serversPorts.length);
+        System.out.println("Coordinator chosen " + serversPorts[rn]);
         // write configuration file with Coordinator port
-        config.setCoordinatorIdx(rn);
+        config.setCoordinatorPort(serversPorts[rn]);
         YamlTool.writeYaml("config.yaml", config);
 
         client = new Client("127.0.0.1", serversPorts[rn]);*/

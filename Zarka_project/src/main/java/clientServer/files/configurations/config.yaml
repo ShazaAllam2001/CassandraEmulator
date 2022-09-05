@@ -1,13 +1,15 @@
-numNodes: 5
-vNodes: 3
+!!helpingTools.yaml.Configuration
 TCPports:
-  - 1000
-  - 2000
-  - 3000
-  - 4000
-  - 5000
+- 1000
+- 2000
+- 3000
+- 4000
+- 5000
+coordinatorPort: 0
+numNodes: 5
 quorum:
   read: 2
   write: 3
 replication: 4
 storeThreshold: 5
+vNodes: 3
