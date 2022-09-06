@@ -8,7 +8,7 @@ TCPports:
 coordinatorPort: 1000
 numNodes: 5
 quorum:
-  read: 2
+  read: 3
   write: 3
 replication: 4
 storeThreshold: 5
