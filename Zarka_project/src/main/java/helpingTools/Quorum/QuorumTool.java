@@ -1,41 +1,89 @@
 package helpingTools.Quorum;
 
+import clientServer.ClientCommand;
 import clientServer.Server;
+import helpingTools.lsmTree.model.LSMTree;
 import helpingTools.yaml.Configuration;
 
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 public class QuorumTool {
-    private Configuration config;
+    private final Configuration config;
+    private final Server coordinator;
+    private int Acknowledged = 0;
+    private boolean ReadValid = false;
 
-    public QuorumTool(Configuration config) {
+    public QuorumTool(Configuration config, Server coordinator) {
         this.config = config;
+        this.coordinator = coordinator;
     }
 
-    public boolean writeQuorum(Server[] servers) {
-        int Acknowledged = 0;
-        for(int i=0; i<servers.length; i++) {
-            // send data to all replication nodes
-
-        }
-        // wait for acknowledge (event listener)
-        // then increment Acknowledged counter
-        // if counter reaches Quorum, return
-        if(Acknowledged == config.getQuorum().getWrite()) {
-            return true;
-        }
-        return false;
-    }
-
-    public String readQuorum(Server[] servers) {
-        for(int i=0; i<servers.length; i++) {
-            // read data from all replication nodes
-
-            for(int j=0; j<config.getQuorum().getRead(); j++) {
-
+    public void sendRequests(List<int[]> serversPorts, List<String> parsedCommand, String receiveMessage, List<LSMTree> trees) {
+        for(int[] serverToAsk : serversPorts) {
+            int portToAsk = serverToAsk[0];
+            int virtualNode = serverToAsk[1];
+            System.out.println("Server chosen to be asked " + portToAsk + " with v = " + virtualNode);
+            if(portToAsk == coordinator.port) {
+                String sendMessage = ClientCommand.executeCommand(parsedCommand, trees.get(virtualNode));
+                coordinator.out.println(sendMessage); // send to client
+            }
+            else {
+                // send request to the first server that has the key
+                for(Server server : coordinator.servers) {
+                    if(portToAsk == server.port) {
+                        server.out.println(receiveMessage + "&" + virtualNode);
+                        break;
+                    }
+                }
             }
         }
-        // return the latest version of data
-        String data = "";
-
-        return data;
     }
+
+    public void checkQuorum(Server serverRequester, ServerSocket serverSocket) throws IOException {
+        String line = "";
+        Map<String,Integer> resultMap = new HashMap<>();
+
+        for(int i=0; i<config.getReplication(); i++) {
+            line = serverRequester.in.readLine();
+            if(line != null) {
+                // output the received message from other server (client) to the client
+                System.out.println("Server port " + serverSocket.getLocalPort()
+                        + ": Received message from server " + serverRequester.port + " = " + line);
+
+                // Write query
+                if(line.equals("Added Successfully!")) {
+                    Acknowledged++;
+                    System.out.println("Write acknowledged from " + Acknowledged);
+                    if(Acknowledged == config.getQuorum().getWrite()) {
+                        Acknowledged = 0;
+                        coordinator.out.println(line);
+                    }
+                }
+                // Read Query
+                else if(line.contains(":")){
+                    if(resultMap.containsKey(line)) {
+                        int readCount = resultMap.get(line) + 1;
+                        if(readCount == config.getQuorum().getRead()) {
+                            ReadValid = true;
+                            coordinator.out.println(line);
+                        }
+                        resultMap.put(line,readCount);
+                    }
+                    else {
+                        resultMap.put(line,1);
+                    }
+                    System.out.println("Read Validity = " + ReadValid);
+                }
+            }
+        }
+        if(Acknowledged>0 && !ReadValid) {
+            coordinator.out.println("Read Invalid!");
+        }
+        ReadValid = false;
+    }
+
 }

@@ -1,6 +1,7 @@
 package clientServer;
 
 import helpingTools.ConsistentHashing.ConsistentHashing;
+import helpingTools.Quorum.QuorumTool;
 import helpingTools.yaml.Configuration;
 import helpingTools.yaml.YamlTool;
 
@@ -16,12 +17,14 @@ public class Server {
     public PrintWriter out;
     public BufferedReader in;
     public final ConsistentHashing consistentHashing;
+    public final QuorumTool quorumTool;
 
     public Server(int port, Configuration config) throws IOException {
         this.port = port;
         this.serverSocket = new ServerSocket(port);
         this.serverSocket.setReuseAddress(true); // For being able to use multi-servers
         this.consistentHashing = new ConsistentHashing(config);
+        this.quorumTool = new QuorumTool(config,this);
         System.out.println("Server started");
     }
 

@@ -8,6 +8,7 @@ public class Configuration {
     private Quorum quorum;
     private int replication;
     private int storeThreshold;
+    private int indexRange;
 
     // getters and setters
     public int getNumNodes() {
@@ -57,6 +58,14 @@ public class Configuration {
     public int getStoreThreshold() { return storeThreshold; }
 
     public void setStoreThreshold(int storeThreshold) { this.storeThreshold = storeThreshold; }
+
+    public int getIndexRange() {
+        return indexRange;
+    }
+
+    public void setIndexRange(int indexRange) {
+        this.indexRange = indexRange;
+    }
 }
 
 

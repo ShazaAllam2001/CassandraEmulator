@@ -1,5 +1,6 @@
 package helpingTools.ConsistentHashing;
 
+import com.google.common.base.Charsets;
 import helpingTools.yaml.Configuration;
 import helpingTools.yaml.YamlTool;
 
@@ -7,10 +8,12 @@ import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeMap;
+import com.google.common.hash.*;
 
 public class ConsistentHashing {
     private Configuration config;
     private TreeMap<Integer,String> nodePlaces;
+    private HashFunction hashFunction = Hashing.murmur3_32_fixed();
 
     public ConsistentHashing(Configuration config) {
         this.config = config;
@@ -22,15 +25,16 @@ public class ConsistentHashing {
         // for each node, put v number of nodes
         for(int i=0; i<config.getNumNodes(); i++) {
             for(int j=0; j<config.getvNodes(); j++) {
-                String name = "n_" + i + "_" + j;
-                Integer token = name.hashCode();
+                String name = i + "_" + j;
+                HashCode hc = hashFunction.newHasher().putString(name, Charsets.UTF_8).hash();
+                Integer token = hc.asInt();
                 nodePlaces.put(token, name);
             }
         }
     }
 
-    public List<Integer> getServers(String key) {
-        List<Integer> servers = new ArrayList<>();
+    public List<int[]> getServers(String key) {
+        List<int[]> servers = new ArrayList<>();
         Integer nodeKey = key.hashCode(); // token of the given key
         // get all server with that number and (RF-1) servers next to it (clockwise)
         for (int i=0; i<config.getReplication(); i++) {
@@ -42,9 +46,12 @@ public class ConsistentHashing {
             }
             // get the name of that node
             String name = nodePlaces.get(nodeKey);
-            // parse the name to get the node number
-            int serverNo = Integer.parseInt(name.split("_", 3)[2]);
-            servers.add(config.getTCPports()[serverNo]);
+            // parse the name to get the node number and virtual number
+            String[] splitName = name.split("_", 3);
+            int serverPort = config.getTCPports()[Integer.parseInt(splitName[0])];
+            int virtualNo = Integer.parseInt(splitName[1]);
+            int[] serverVirtual = new int[] {serverPort, virtualNo};
+            servers.add(serverVirtual);
         }
         return servers;
     }
@@ -58,7 +65,7 @@ public class ConsistentHashing {
         Integer nodeKey;
         for(int i=0; i<config.getvNodes(); i++) {
             // generate token for the new node
-            String name = "n_" + config.getNumNodes() + "_" + i;
+            String name = config.getNumNodes() + "_" + i;
             Integer token = name.hashCode();
             nodePlaces.put(token, name);
 
@@ -73,7 +80,7 @@ public class ConsistentHashing {
             name = nodePlaces.get(nodeKey);
             // parse the name to get the node number
             int serverNo = Integer.parseInt(name.split("_", 3)[2]);
-            servers[i][0] = serverNo;
+            servers[i][0] = config.getTCPports()[serverNo];
 
             // find the key of the node with the next higher key
             nodeKey = nodePlaces.higherKey(token.hashCode());
@@ -84,7 +91,7 @@ public class ConsistentHashing {
             name = nodePlaces.get(nodeKey);
             // parse the name to get the node number
             serverNo = Integer.parseInt(name.split("_", 3)[2]);
-            servers[i][1] = serverNo;
+            servers[i][1] = config.getTCPports()[serverNo];
         }
 
         return servers;

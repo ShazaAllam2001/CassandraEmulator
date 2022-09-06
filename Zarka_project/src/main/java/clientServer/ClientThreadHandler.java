@@ -7,12 +7,17 @@ import helpingTools.yaml.YamlTool;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.List;
+
+import static helpingTools.lsmTree.model.LSMTree.dirTree;
 
 public class ClientThreadHandler implements Runnable {
     private final ServerSocket serverSocket;
     private final Server coordinator;
-    private Socket socket;
     private final int i;
+    private Socket socket;
+    private List<LSMTree> trees = new ArrayList<>();
 
     public ClientThreadHandler(ServerSocket serverSocket, Server coordinator, int i) {
         this.serverSocket = serverSocket;
@@ -23,8 +28,17 @@ public class ClientThreadHandler implements Runnable {
     @Override
     public void run() {
         try {
-            //Configuration config = YamlTool.readYaml("config.yaml");
-            //LSMTree tree = new LSMTree("server_" + i + "_Tree", config.getStoreThreshold(), 5);
+            // make directory for the node
+            String treeName = "server_" + i + "_Tree";
+            File theDir = new File(dirTree + treeName + "\\");
+            if (!theDir.exists()){
+                theDir.mkdirs();
+            }
+            // create V LSM trees
+            Configuration config = YamlTool.readYaml("config.yaml");
+            for(int j=0 ; j<config.getvNodes(); j++) {
+                trees.add(new LSMTree(treeName + "\\" + "virtual_" + j, config.getStoreThreshold(), config.getIndexRange()));
+            }
 
             this.socket = serverSocket.accept();
             System.out.println("Client accepted");
@@ -49,29 +63,32 @@ public class ClientThreadHandler implements Runnable {
 
                 if(receiveMessage != null) {
                     System.out.println("Server port " + coordinator.port + ": Received message from client = " + receiveMessage);
-                    coordinator.servers.get(0).out.println(receiveMessage);
                     // parse & execute command
-                    /*List<String> parsedCommand = ClientCommand.parseCommand(receiveMessage);
+                    List<String> parsedCommand = ClientCommand.parseCommand(receiveMessage);
                     // get nums of servers associated with the key
                     if(!parsedCommand.get(0).equals("Invalid Command!")) {
-                        List<Integer> serversPorts = coordinator.consistentHashing.getServers(parsedCommand.get(1));
-                        // if the key exists in the coordinator
-                        if(serversPorts.contains(config.getTCPports()[config.getCoordinatorIdx()])) {
-                            sendMessage = ClientCommand.executeCommand(parsedCommand, tree);
-                            coordinator.out.println(sendMessage);
-                            coordinator.out.flush();
-                        }
-                        else {
-                            int portToAsk = serversPorts.get(0);
-                            // send request to the first server that has the key
-                            for(int i=0; i<coordinator.servers.size(); i++) {
-                                if(portToAsk == coordinator.servers.get(i).port) {
-                                    coordinator.servers.get(i).out.println(receiveMessage);
-                                    break;
+                        List<int[]> serversPorts = coordinator.consistentHashing.getServers(parsedCommand.get(1));
+                        coordinator.quorumTool.sendRequests(serversPorts,parsedCommand,receiveMessage,trees);
+                        /*for(int[] serverToAsk : serversPorts) {
+                            int portToAsk = serverToAsk[0];
+                            int virtualNode = serverToAsk[1];
+                            System.out.println("Server chosen to be asked " + portToAsk + " with v = " + virtualNode);
+                            if(portToAsk == coordinator.port) {
+                                sendMessage = ClientCommand.executeCommand(parsedCommand, trees.get(virtualNode));
+                                coordinator.out.println(sendMessage); // send to client
+                            }
+                            else {
+                                // send request to the first server that has the key
+                                for(Server server : coordinator.servers) {
+                                    if(portToAsk == server.port) {
+                                        server.out.println(receiveMessage + "&" + virtualNode);
+                                        break;
+                                    }
                                 }
                             }
-                        }
-                    }*/ /*else {
+                        }*/
+
+                    } /*else {
                         sendMessage = "Invalid Command!";
                         coordinator.out.println(sendMessage);
                         coordinator.out.flush();

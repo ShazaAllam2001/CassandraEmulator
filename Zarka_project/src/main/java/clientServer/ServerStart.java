@@ -2,13 +2,14 @@ package clientServer;
 
 import helpingTools.lsmTree.model.LSMTree;
 import helpingTools.yaml.Configuration;
+import helpingTools.yaml.YamlTool;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.List;
+
+import static helpingTools.lsmTree.model.LSMTree.dirTree;
 
 public class ServerStart {
 
@@ -34,7 +35,20 @@ public class ServerStart {
         return servers;
     }
 
-    public static Socket startServer(int port, LSMTree tree) throws IOException {
+    public static Socket startServer(int port, Configuration config, int i) throws IOException {
+        List<LSMTree> trees = new ArrayList<>();
+
+        // make directory for the node
+        String treeName = "server_" + i + "_Tree";
+        File theDir = new File(dirTree + treeName + "\\");
+        if (!theDir.exists()){
+            theDir.mkdirs();
+        }
+        // create V LSM trees
+        for(int j=0 ; j<config.getvNodes(); j++) {
+            trees.add(new LSMTree(treeName + "\\" + "virtual_" + j, config.getStoreThreshold(), config.getIndexRange()));
+        }
+
         // establish a connection by providing host and port number
         Socket socket = new Socket("127.0.0.1", port);
 
@@ -59,7 +73,8 @@ public class ServerStart {
                 System.out.println("Received message from server port " + port + " = " + receiveMessage);
                 // parse & execute command
                 List<String> parsedCommand = ClientCommand.parseCommand(receiveMessage);
-                sendMessage = ClientCommand.executeCommand(parsedCommand, tree);
+                int virtualNode = Integer.parseInt(parsedCommand.get(parsedCommand.size()-1));
+                sendMessage = ClientCommand.executeCommand(parsedCommand, trees.get(virtualNode));
                 out.println(sendMessage); // send to coordinator
             }
         }

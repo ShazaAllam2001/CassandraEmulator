@@ -30,13 +30,18 @@ public class ServerThreadHandler implements Runnable {
             // get the outputstream of other server (client)
             serverRequester.out = new PrintWriter(socket.getOutputStream(), true);
 
-            String line;
-            while ((line = serverRequester.in.readLine()) != null) {
-                Configuration config = YamlTool.readYaml("config.yaml");;
-                // output the received message from other server (client) to the client
-                System.out.println("Server port " + serverSocket.getLocalPort()
-                                    + ": Received message from server " + serverRequester.port + " = " + line);
-                coordinator.out.println(line);
+            //String line;
+            while(true) {
+                coordinator.quorumTool.checkQuorum(serverRequester,serverSocket);
+
+                /*line = serverRequester.in.readLine();
+                if(line != null) {
+                    // output the received message from other server (client) to the client
+                    System.out.println("Server port " + serverSocket.getLocalPort()
+                            + ": Received message from server " + serverRequester.port + " = " + line);
+
+                    coordinator.out.println(line);
+                }*/
             }
         }
         catch (IOException e) {
