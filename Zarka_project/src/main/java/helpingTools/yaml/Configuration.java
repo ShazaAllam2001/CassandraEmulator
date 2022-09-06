@@ -9,6 +9,7 @@ public class Configuration {
     private int replication;
     private int storeThreshold;
     private int indexRange;
+    private Node[] replicas;
 
     // getters and setters
     public int getNumNodes() {
@@ -65,6 +66,14 @@ public class Configuration {
 
     public void setIndexRange(int indexRange) {
         this.indexRange = indexRange;
+    }
+
+    public Node[] getReplicas() {
+        return replicas;
+    }
+
+    public void setReplicas(Node[] replicas) {
+        this.replicas = replicas;
     }
 }
 

@@ -5,7 +5,7 @@ TCPports:
 - 3000
 - 4000
 - 5000
-coordinatorPort: 0
+coordinatorPort: 1000
 numNodes: 5
 quorum:
   read: 2
@@ -14,3 +14,24 @@ replication: 4
 storeThreshold: 5
 indexRange: 5
 vNodes: 3
+replicas:
+  - replicaIndices:
+      - [ 2_0, 3_0, 4_0 ]
+      - [ 2_1, 3_1, 4_1 ]
+      - [ 2_2, 3_2, 4_2 ]
+  - replicaIndices:
+      - [ 0_0, 2_0, 3_0 ]
+      - [ 0_1, 2_1, 3_1 ]
+      - [ 0_2, 2_2, 3_2 ]
+  - replicaIndices:
+      - [ 0_0, 1_0, 4_0 ]
+      - [ 0_1, 1_1, 4_1 ]
+      - [ 0_2, 1_2, 4_2 ]
+  - replicaIndices:
+      - [ 0_0, 1_0, 4_0 ]
+      - [ 0_1, 1_1, 4_1 ]
+      - [ 0_2, 1_2, 4_2 ]
+  - replicaIndices:
+      - [ 1_0, 2_0, 3_0 ]
+      - [ 1_1, 2_1, 3_1 ]
+      - [ 1_2, 2_2, 3_2 ]

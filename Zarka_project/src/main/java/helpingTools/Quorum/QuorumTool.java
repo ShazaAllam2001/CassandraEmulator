@@ -46,6 +46,7 @@ public class QuorumTool {
     public void checkQuorum(Server serverRequester, ServerSocket serverSocket) throws IOException {
         String line = "";
         Map<String,Integer> resultMap = new HashMap<>();
+        ReadValid = false;
 
         for(int i=0; i<config.getReplication(); i++) {
             line = serverRequester.in.readLine();
@@ -71,7 +72,7 @@ public class QuorumTool {
                             ReadValid = true;
                             coordinator.out.println(line);
                         }
-                        resultMap.put(line,readCount);
+                        resultMap.replace(line,readCount);
                     }
                     else {
                         resultMap.put(line,1);
@@ -79,11 +80,14 @@ public class QuorumTool {
                     System.out.println("Read Validity = " + ReadValid);
                 }
             }
+            System.out.println(Acknowledged + " " + ReadValid);
         }
-        if(Acknowledged>0 && !ReadValid) {
-            coordinator.out.println("Read Invalid!");
+        // return "Read Invalid", if it is a read request which is invalid
+        if(!line.equals("Added Successfully!") && !ReadValid) {
+            if(resultMap.get(line) < config.getQuorum().getRead()) {
+                coordinator.out.println("Read Invalid!");
+            }
         }
-        ReadValid = false;
     }
 
 }

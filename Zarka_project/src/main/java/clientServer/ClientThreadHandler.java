@@ -49,7 +49,7 @@ public class ClientThreadHandler implements Runnable {
             // receiving from server (receiveRead  object)
             coordinator.in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-            String receiveMessage, sendMessage;
+            String receiveMessage;
             while(true) {
                 receiveMessage = coordinator.in.readLine();
                 if (receiveMessage == "Exit") {
@@ -69,30 +69,11 @@ public class ClientThreadHandler implements Runnable {
                     if(!parsedCommand.get(0).equals("Invalid Command!")) {
                         List<int[]> serversPorts = coordinator.consistentHashing.getServers(parsedCommand.get(1));
                         coordinator.quorumTool.sendRequests(serversPorts,parsedCommand,receiveMessage,trees);
-                        /*for(int[] serverToAsk : serversPorts) {
-                            int portToAsk = serverToAsk[0];
-                            int virtualNode = serverToAsk[1];
-                            System.out.println("Server chosen to be asked " + portToAsk + " with v = " + virtualNode);
-                            if(portToAsk == coordinator.port) {
-                                sendMessage = ClientCommand.executeCommand(parsedCommand, trees.get(virtualNode));
-                                coordinator.out.println(sendMessage); // send to client
-                            }
-                            else {
-                                // send request to the first server that has the key
-                                for(Server server : coordinator.servers) {
-                                    if(portToAsk == server.port) {
-                                        server.out.println(receiveMessage + "&" + virtualNode);
-                                        break;
-                                    }
-                                }
-                            }
-                        }*/
 
-                    } /*else {
-                        sendMessage = "Invalid Command!";
-                        coordinator.out.println(sendMessage);
+                    } else {
+                        coordinator.out.println("Invalid Command!");
                         coordinator.out.flush();
-                    }*/
+                    }
                 }
             }
         }

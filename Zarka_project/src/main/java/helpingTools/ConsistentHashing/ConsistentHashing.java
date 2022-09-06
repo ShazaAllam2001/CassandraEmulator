@@ -35,25 +35,44 @@ public class ConsistentHashing {
 
     public List<int[]> getServers(String key) {
         List<int[]> servers = new ArrayList<>();
-        Integer nodeKey = key.hashCode(); // token of the given key
-        // get all server with that number and (RF-1) servers next to it (clockwise)
-        for (int i=0; i<config.getReplication(); i++) {
-            // find the key of the node with the next higher key
-            nodeKey = nodePlaces.higherKey(nodeKey);
-            // if there is no node with higher key token, get the lowest key
-            if(nodeKey == null) {
-                nodeKey = nodePlaces.firstKey();
-            }
-            // get the name of that node
-            String name = nodePlaces.get(nodeKey);
-            // parse the name to get the node number and virtual number
-            String[] splitName = name.split("_", 3);
-            int serverPort = config.getTCPports()[Integer.parseInt(splitName[0])];
-            int virtualNo = Integer.parseInt(splitName[1]);
-            int[] serverVirtual = new int[] {serverPort, virtualNo};
-            servers.add(serverVirtual);
+        HashFunction hashFunction = Hashing.murmur3_32_fixed();
+        HashCode hc = hashFunction.newHasher().putString(key, Charsets.UTF_8).hash();
+        Integer nodeKey = hc.asInt(); // token of the given key
+        // find the key of the node with the next higher key
+        nodeKey = nodePlaces.higherKey(nodeKey);
+        // if there is no node with higher key token, get the lowest key
+        if(nodeKey == null) {
+            nodeKey = nodePlaces.firstKey();
         }
+        // get the name of that node
+        String name = nodePlaces.get(nodeKey);
+        // parse the name to get the node number and virtual number
+        String[] splitName = name.split("_", 3);
+        int serverNo = Integer.parseInt(splitName[0]);
+        int serverPort = config.getTCPports()[serverNo];
+        int virtualNo = Integer.parseInt(splitName[1]);
+        int[] serverVirtual = new int[] {serverPort, virtualNo};
+        servers.add(serverVirtual);
+        // get all server with that number and (RF-1) servers
+        servers.addAll(getReplicas(serverNo,virtualNo));
+
         return servers;
+    }
+
+    public List<int[]> getReplicas(int serverNo, int virtualNo) {
+        List<int[]> replicas = new ArrayList<>();
+        // get all (RF-1) servers
+        for (int i=0; i<config.getReplication()-1; i++) {
+            // parse the name to get the node number and virtual number
+            String replica = config.getReplicas()[serverNo].getVirtual(virtualNo)[i];
+            String[] splitName = replica.split("_", 3);
+            serverNo = Integer.parseInt(splitName[0]);
+            int serverPort = config.getTCPports()[serverNo];
+            virtualNo = Integer.parseInt(splitName[1]);
+            int[] serverVirtual = new int[] {serverPort, virtualNo};
+            replicas.add(serverVirtual);
+        }
+        return replicas;
     }
 
     public int[][] addNode() throws FileNotFoundException {

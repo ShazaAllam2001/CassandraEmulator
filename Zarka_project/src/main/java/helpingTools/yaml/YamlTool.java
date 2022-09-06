@@ -28,4 +28,10 @@ public class YamlTool {
         yaml.dump(obj, writer);
     }
 
+    public static void main(String[] args) throws Exception {
+        Configuration config = YamlTool.readYaml("config.yaml");
+        System.out.println(config.getReplicas()[0].getVirtual(1).length);
+
+    }
+
 }
