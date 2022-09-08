@@ -61,15 +61,16 @@ public class ConsistentHashing {
 
     public List<int[]> getReplicas(int serverNo, int virtualNo) {
         List<int[]> replicas = new ArrayList<>();
+        int replicaServerNo, replicaServerPort, replicaVirtualNo;
         // get all (RF-1) servers
         for (int i=0; i<config.getReplication()-1; i++) {
             // parse the name to get the node number and virtual number
             String replica = config.getReplicas()[serverNo].getVirtual(virtualNo)[i];
             String[] splitName = replica.split("_", 3);
-            serverNo = Integer.parseInt(splitName[0]);
-            int serverPort = config.getTCPports()[serverNo];
-            virtualNo = Integer.parseInt(splitName[1]);
-            int[] serverVirtual = new int[] {serverPort, virtualNo};
+            replicaServerNo = Integer.parseInt(splitName[0]);
+            replicaServerPort = config.getTCPports()[replicaServerNo];
+            replicaVirtualNo = Integer.parseInt(splitName[1]);
+            int[] serverVirtual = new int[] { replicaServerPort, replicaVirtualNo };
             replicas.add(serverVirtual);
         }
         return replicas;
@@ -80,7 +81,7 @@ public class ConsistentHashing {
         config.setNumNodes(config.getNumNodes() + 1);
         YamlTool.writeYaml("config.yaml", config);
 
-        int[][] servers = new int[config.getvNodes()][2];
+        int[][] servers = new int[config.getvNodes()][4];
         Integer nodeKey;
         for(int i=0; i<config.getvNodes(); i++) {
             // generate token for the new node
@@ -98,8 +99,11 @@ public class ConsistentHashing {
             // get the name of that node
             name = nodePlaces.get(nodeKey);
             // parse the name to get the node number
-            int serverNo = Integer.parseInt(name.split("_", 3)[2]);
+            String[] splitName = name.split("_", 3);
+            int serverNo = Integer.parseInt(splitName[0]);
+            int virtualNo = Integer.parseInt(splitName[1]);
             servers[i][0] = config.getTCPports()[serverNo];
+            servers[i][1] = virtualNo;
 
             // find the key of the node with the next higher key
             nodeKey = nodePlaces.higherKey(token.hashCode());
@@ -109,8 +113,11 @@ public class ConsistentHashing {
             // get the name of that node
             name = nodePlaces.get(nodeKey);
             // parse the name to get the node number
-            serverNo = Integer.parseInt(name.split("_", 3)[2]);
-            servers[i][1] = config.getTCPports()[serverNo];
+            splitName = name.split("_", 3);
+            serverNo = Integer.parseInt(splitName[0]);
+            virtualNo = Integer.parseInt(splitName[1]);
+            servers[i][2] = config.getTCPports()[serverNo];
+            servers[i][3] = virtualNo;
         }
 
         return servers;

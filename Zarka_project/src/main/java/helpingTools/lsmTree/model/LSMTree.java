@@ -363,7 +363,7 @@ public class LSMTree implements ILSMTree {
                 }
             }
             if (command instanceof SetCommand) {
-                return ((SetCommand) command).getValue();
+                return ((SetCommand) command).getValue() + "&" + ((SetCommand) command).getVersion();
             }
             if (command instanceof RmCommand) {
                 return null;

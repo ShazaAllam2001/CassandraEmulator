@@ -25,7 +25,7 @@ public class Server {
         this.serverSocket.setReuseAddress(true); // For being able to use multi-servers
         this.consistentHashing = new ConsistentHashing(config);
         this.quorumTool = new QuorumTool(config,this);
-        System.out.println("Server started");
+        System.out.println("Server " + port + " started");
     }
 
     public void connectToClient(int i) {

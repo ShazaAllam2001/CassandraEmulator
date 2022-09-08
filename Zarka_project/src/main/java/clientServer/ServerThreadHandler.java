@@ -1,8 +1,5 @@
 package clientServer;
 
-import helpingTools.yaml.Configuration;
-import helpingTools.yaml.YamlTool;
-
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -22,7 +19,7 @@ public class ServerThreadHandler implements Runnable {
     public void run() {
         try {
             Socket socket = serverSocket.accept();
-            System.out.println("New Server Connected");
+            System.out.println("Server " + socket.getLocalPort() + " Connected to " + serverRequester.port);
 
             // get the inputstream of other server (client)
             serverRequester.in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -30,10 +27,15 @@ public class ServerThreadHandler implements Runnable {
             // get the outputstream of other server (client)
             serverRequester.out = new PrintWriter(socket.getOutputStream(), true);
 
-            //String line;
+            String line;
             while(true) {
-                coordinator.quorumTool.checkQuorum(serverRequester,serverSocket);
-
+                line = serverRequester.in.readLine();
+                if(line != null) {
+                    String sendMessage = coordinator.quorumTool.checkQuorum(serverRequester, serverSocket, line);
+                    if(sendMessage != null) {
+                        coordinator.out.println(sendMessage);
+                    }
+                }
                 /*line = serverRequester.in.readLine();
                 if(line != null) {
                     // output the received message from other server (client) to the client
@@ -54,7 +56,6 @@ public class ServerThreadHandler implements Runnable {
                 }
                 if (serverRequester.in != null) {
                     serverRequester.in.close();
-                    //clientSocket.close();
                 }
             }
             catch (IOException e) {

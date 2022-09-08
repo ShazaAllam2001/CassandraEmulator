@@ -6,6 +6,8 @@ public class SetCommand extends AbstractCommand {
 
     private String value;
 
+    private String version;
+
     @Override
     public String getKey() {
         return key;
@@ -23,9 +25,18 @@ public class SetCommand extends AbstractCommand {
         this.value = value;
     }
 
+    public String getVersion() {
+        return version;
+    }
+
+    public void setVersion(String version) {
+        this.version = version;
+    }
+
     public SetCommand(String key, String value) {
         super(CommandTypeEnum.SET);
         this.key = key;
         this.value = value;
+        this.version = String.valueOf(System.currentTimeMillis());
     }
 }

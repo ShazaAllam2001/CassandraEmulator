@@ -1,13 +1,14 @@
 package clientServer;
 
+import helpingTools.addNode.checkNewNode;
 import helpingTools.lsmTree.model.LSMTree;
 import helpingTools.yaml.Configuration;
-import helpingTools.yaml.YamlTool;
 
 import java.io.*;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
 
 import static helpingTools.lsmTree.model.LSMTree.dirTree;
 
@@ -31,6 +32,10 @@ public class ServerStart {
         for(int i=0; i<config.getNumNodes(); i++) {
             servers[i].connectToClient(i);
         }
+
+        // check to add a new node
+        /*Timer timer = new Timer();
+        timer.schedule(new checkNewNode(), 0, 10000); // run every 3 minutes 180000*/
 
         return servers;
     }
@@ -73,9 +78,15 @@ public class ServerStart {
                 System.out.println("Received message from server port " + port + " = " + receiveMessage);
                 // parse & execute command
                 List<String> parsedCommand = ClientCommand.parseCommand(receiveMessage);
-                int virtualNode = Integer.parseInt(parsedCommand.get(parsedCommand.size()-1));
-                sendMessage = ClientCommand.executeCommand(parsedCommand, trees.get(virtualNode));
-                out.println(sendMessage); // send to coordinator
+                if(parsedCommand.size()<=4) { // not a read repair message
+                    int virtualNode = Integer.parseInt(parsedCommand.get(parsedCommand.size()-1));
+                    sendMessage = ClientCommand.executeCommand(parsedCommand, trees.get(virtualNode));
+                    out.println(sendMessage); // send to coordinator
+                } else {
+                    int virtualNode = Integer.parseInt(parsedCommand.get(parsedCommand.size()-2));
+                    ClientCommand.executeCommand(parsedCommand, trees.get(virtualNode));
+                }
+
             }
         }
 

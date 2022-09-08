@@ -11,8 +11,8 @@ quorum:
   read: 3
   write: 3
 replication: 4
-storeThreshold: 5
-indexRange: 5
+storeThreshold: 8
+indexRange: 4
 vNodes: 3
 replicas:
   - replicaIndices:

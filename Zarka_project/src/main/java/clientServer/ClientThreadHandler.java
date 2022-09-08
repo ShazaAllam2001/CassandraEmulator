@@ -1,6 +1,7 @@
 package clientServer;
 
 import helpingTools.lsmTree.model.LSMTree;
+import helpingTools.lsmTree.treeUtils.CompactTask;
 import helpingTools.yaml.Configuration;
 import helpingTools.yaml.YamlTool;
 
@@ -9,6 +10,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
 
 import static helpingTools.lsmTree.model.LSMTree.dirTree;
 
@@ -39,6 +41,10 @@ public class ClientThreadHandler implements Runnable {
             for(int j=0 ; j<config.getvNodes(); j++) {
                 trees.add(new LSMTree(treeName + "\\" + "virtual_" + j, config.getStoreThreshold(), config.getIndexRange()));
             }
+
+            // compact segments
+            Timer timer = new Timer();
+            timer.schedule(new CompactTask(trees), 0, 300000); // run every 5 minutes
 
             this.socket = serverSocket.accept();
             System.out.println("Client accepted");
